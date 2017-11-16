@@ -1,7 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
+from cloudshell.layer_one.core.response.response_info import GetStateIdResponseInfo
+from fiberzone_afm.cli.fiberzone_cli_handler import FiberzoneCliHandler
+from fiberzone_afm.command_actions.autoload_actions import AutoloadActions
 
 
 class DriverCommands(DriverCommandsInterface):
@@ -15,6 +17,7 @@ class DriverCommands(DriverCommandsInterface):
         :type logger: logging.Logger
         """
         self._logger = logger
+        self._cli_handler = FiberzoneCliHandler(logger)
 
     def login(self, address, username, password):
         """
@@ -34,7 +37,10 @@ class DriverCommands(DriverCommandsInterface):
                 device_info = session.send_command('show version')
                 self._logger.info(device_info)
         """
-        raise NotImplementedError
+        self._cli_handler.define_session_attributes(address, username, password)
+        with self._cli_handler.default_mode_service() as session:
+            autoload_actions = AutoloadActions(session, self._logger)
+            self._logger.info(autoload_actions.board_info())
 
     def get_state_id(self):
         """
@@ -50,7 +56,7 @@ class DriverCommands(DriverCommandsInterface):
                 chassis_name = session.send_command('show chassis name')
                 return chassis_name
         """
-        raise NotImplementedError
+        return GetStateIdResponseInfo(-1)
 
     def set_state_id(self, state_id):
         """
@@ -66,7 +72,7 @@ class DriverCommands(DriverCommandsInterface):
                 # Execute command
                 session.send_command('set chassis name {}'.format(state_id))
         """
-        raise NotImplementedError
+        pass
 
     def map_bidi(self, src_port, dst_port):
         """
@@ -135,7 +141,9 @@ class DriverCommands(DriverCommandsInterface):
 
             return ResourceDescriptionResponseInfo([chassis])
         """
-        raise NotImplementedError
+        with self._cli_handler.default_mode_service() as session:
+            autoload_actions = AutoloadActions(session, self._logger)
+            self._logger.info(autoload_actions.ports_info())
 
     def map_clear(self, ports):
         """

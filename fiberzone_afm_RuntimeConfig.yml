@@ -1,7 +1,7 @@
-#CLI:
-#  TYPE: [SSH,TELNET]
-#  PORTS:
-#    SSH: 22
-#    TELNET: 23
+CLI:
+  TYPE: [SSH,TELNET]
+  PORTS:
+    SSH: 22
+    TELNET: 23
 LOGGING:
   LEVEL: INFO

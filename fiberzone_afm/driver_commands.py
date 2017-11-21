@@ -1,9 +1,12 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+import os
+
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
-from cloudshell.layer_one.core.response.response_info import GetStateIdResponseInfo
-from fiberzone_afm.cli.fiberzone_cli_handler import FiberzoneCliHandler
+from cloudshell.layer_one.core.response.response_info import GetStateIdResponseInfo, ResourceDescriptionResponseInfo
 from fiberzone_afm.command_actions.autoload_actions import AutoloadActions
+from fiberzone_afm.helpers.autoload_helper import AutoloadHelper
+from fiberzone_afm.helpers.test_cli import TestCliHandler
 
 
 class DriverCommands(DriverCommandsInterface):
@@ -17,7 +20,9 @@ class DriverCommands(DriverCommandsInterface):
         :type logger: logging.Logger
         """
         self._logger = logger
-        self._cli_handler = FiberzoneCliHandler(logger)
+        # self._cli_handler = FiberzoneCliHandler(logger)
+        self._cli_handler = TestCliHandler(
+            os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
 
     def login(self, address, username, password):
         """
@@ -40,7 +45,7 @@ class DriverCommands(DriverCommandsInterface):
         self._cli_handler.define_session_attributes(address, username, password)
         with self._cli_handler.default_mode_service() as session:
             autoload_actions = AutoloadActions(session, self._logger)
-            self._logger.info(autoload_actions.board_info())
+            self._logger.info('Connected to ' + autoload_actions.board_table().get('model_name'))
 
     def get_state_id(self):
         """
@@ -143,7 +148,11 @@ class DriverCommands(DriverCommandsInterface):
         """
         with self._cli_handler.default_mode_service() as session:
             autoload_actions = AutoloadActions(session, self._logger)
-            self._logger.info(autoload_actions.ports_info())
+            board_table = autoload_actions.board_table()
+            ports_table = autoload_actions.ports_table()
+            autoload_helper = AutoloadHelper(address, board_table, ports_table, self._logger)
+            response_info = ResourceDescriptionResponseInfo(autoload_helper.build_structure())
+            return response_info
 
     def map_clear(self, ports):
         """

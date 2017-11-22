@@ -1,6 +1,13 @@
+from cloudshell.layer_one.core.response.resource_info.entities.attributes import NumericAttribute
 from cloudshell.layer_one.core.response.resource_info.entities.blade import Blade
 from cloudshell.layer_one.core.response.resource_info.entities.chassis import Chassis
 from cloudshell.layer_one.core.response.resource_info.entities.port import Port
+
+
+class FiberzonePort(Port):
+    def set_admin_locked(self, value):
+        if value:
+            self.attributes.append(NumericAttribute('Admin Lock', value))
 
 
 class AutoloadHelper(object):
@@ -45,9 +52,10 @@ class AutoloadHelper(object):
             else:
                 blade = blades_dict.get(blade_id)
 
-            port = Port(port_id, 'Generic L1 Port', 'NA')
+            port = FiberzonePort(port_id, 'Generic L1 Port', 'NA')
             port.set_model_name('Port Paired')
             port.set_parent_resource(blade)
+            port.set_admin_locked(port_record.get('locked'))
             ports_dict[port_id] = port
         return ports_dict
 

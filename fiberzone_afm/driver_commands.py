@@ -3,8 +3,10 @@
 import os
 
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
-from cloudshell.layer_one.core.response.response_info import GetStateIdResponseInfo, ResourceDescriptionResponseInfo
+from cloudshell.layer_one.core.response.response_info import GetStateIdResponseInfo, ResourceDescriptionResponseInfo, \
+    AttributeValueResponseInfo
 from fiberzone_afm.command_actions.autoload_actions import AutoloadActions
+from fiberzone_afm.command_actions.mapping_actions import MappingActions
 from fiberzone_afm.helpers.autoload_helper import AutoloadHelper
 from fiberzone_afm.helpers.test_cli import TestCliHandler
 
@@ -23,6 +25,19 @@ class DriverCommands(DriverCommandsInterface):
         # self._cli_handler = FiberzoneCliHandler(logger)
         self._cli_handler = TestCliHandler(
             os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
+
+        self.__ports_table = None
+
+    @property
+    def _ports_table(self):
+        """
+        :rtype: dict
+        """
+        if not self.__ports_table:
+            with self._cli_handler.default_mode_service() as session:
+                autoload_actions = AutoloadActions(session, self._logger)
+                self.__ports_table = autoload_actions.ports_table()
+        return self.__ports_table
 
     def login(self, address, username, password):
         """
@@ -94,7 +109,9 @@ class DriverCommands(DriverCommandsInterface):
                 session.send_command('map bidir {0} {1}'.format(convert_port(src_port), convert_port(dst_port)))
 
         """
-        raise NotImplementedError
+        src_port_id = self._convert_port(src_port)
+        dst_port_id = self._convert_port(dst_port)
+        self._connect_ports(src_port_id, dst_port_id)
 
     def map_uni(self, src_port, dst_ports):
         """
@@ -111,7 +128,7 @@ class DriverCommands(DriverCommandsInterface):
                 for dst_port in dst_ports:
                     session.send_command('map {0} also-to {1}'.format(convert_port(src_port), convert_port(dst_port)))
         """
-        raise NotImplementedError
+        raise Exception(self.__class__.__name__, 'Unidirectional connections are not allowed')
 
     def get_resource_description(self, address):
         """
@@ -149,10 +166,49 @@ class DriverCommands(DriverCommandsInterface):
         with self._cli_handler.default_mode_service() as session:
             autoload_actions = AutoloadActions(session, self._logger)
             board_table = autoload_actions.board_table()
-            ports_table = autoload_actions.ports_table()
-            autoload_helper = AutoloadHelper(address, board_table, ports_table, self._logger)
+            self.__ports_table = autoload_actions.ports_table()
+            autoload_helper = AutoloadHelper(address, board_table, self.__ports_table, self._logger)
             response_info = ResourceDescriptionResponseInfo(autoload_helper.build_structure())
             return response_info
+
+    @staticmethod
+    def _convert_port(cs_port):
+        return cs_port.split('/')[-1]
+
+    def _validate_port(self, port_id):
+        port_id = str(port_id)
+        port_data = self._ports_table.get(port_id)
+        if port_data:
+            if port_data.get('locked') == '2':
+                raise Exception(self.__class__.__name__, 'Port Admin Lock state is Locked')
+        else:
+            raise Exception(self.__class__.__name__, 'Port "{}"does not exist'.format(port_id))
+
+    def _paired_port(self, port_id):
+        port_id = str(port_id)
+        port_data = self._ports_table.get(port_id)
+        if port_data:
+            return port_data.get('connected')
+        else:
+            raise Exception(self.__class__.__name__, 'Port "{}" does not exist'.format(port_id))
+
+    def _connect_ports(self, src_port_id, dst_port_id):
+        self._validate_port(src_port_id)
+        self._validate_port(dst_port_id)
+        with self._cli_handler.default_mode_service() as session:
+            mapping_actions = MappingActions(session, self._logger)
+            mapping_actions.connect(src_port_id, dst_port_id)
+            self._ports_table.get(src_port_id)['connected'] = dst_port_id
+            self._ports_table.get(dst_port_id)['connected'] = src_port_id
+
+    def _disconnect_ports(self, src_port_id, dst_port_id):
+        self._validate_port(src_port_id)
+        self._validate_port(dst_port_id)
+        with self._cli_handler.default_mode_service() as session:
+            mapping_actions = MappingActions(session, self._logger)
+            mapping_actions.disconnect(src_port_id, dst_port_id)
+            self._ports_table.get(src_port_id)['connected'] = None
+            self._ports_table.get(dst_port_id)['connected'] = None
 
     def map_clear(self, ports):
         """
@@ -167,7 +223,11 @@ class DriverCommands(DriverCommandsInterface):
             for port in ports:
                 session.send_command('map clear {}'.format(convert_port(port)))
         """
-        raise NotImplementedError
+        for src_port in ports:
+            src_port_id = self._convert_port(src_port)
+            dst_port_id = self._paired_port(src_port_id)
+            if dst_port_id:
+                self._disconnect_ports(src_port_id, dst_port_id)
 
     def map_clear_to(self, src_port, dst_ports):
         """
@@ -186,7 +246,11 @@ class DriverCommands(DriverCommandsInterface):
                     _dst_port = convert_port(port)
                     session.send_command('map clear-to {0} {1}'.format(_src_port, _dst_port))
         """
-        raise NotImplementedError
+        if len(dst_ports) != 1:
+            raise Exception(self.__class__.__name__, 'MapClearTo operation is not allowed for multiple Dst ports')
+        src_port_id = self._convert_port(src_port)
+        dst_port_id = self._convert_port(dst_ports[0])
+        self._disconnect_ports(src_port_id, dst_port_id)
 
     def get_attribute_value(self, cs_address, attribute_name):
         """
@@ -205,7 +269,15 @@ class DriverCommands(DriverCommandsInterface):
                 value = session.send_command(command)
                 return AttributeValueResponseInfo(value)
         """
-        raise NotImplementedError
+        serial_number = 'Serial Number'
+        if len(cs_address.split('/')) == 1 and attribute_name == serial_number:
+            with self._cli_handler.default_mode_service() as session:
+                autoload_actions = AutoloadActions(session, self._logger)
+                board_table = autoload_actions.board_table()
+            return AttributeValueResponseInfo(board_table.get('serial_number'))
+        else:
+            raise Exception(self.__class__.__name__,
+                            'Attribute {0} for {1} is not available'.format(attribute_name, cs_address))
 
     def set_attribute_value(self, cs_address, attribute_name, attribute_value):
         """

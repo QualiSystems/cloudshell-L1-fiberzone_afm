@@ -25,9 +25,7 @@ class AutoloadActions(object):
 
     def board_table(self):
         """
-        Chassis table
-        :return: list of chassis data, [{'index': '1', 'model': 'MRV Chassis', 'serial': '1ndsKsf'}, ]
-        :rtype: list
+        :rtype: dict
         """
         board_table = {}
         output = CommandTemplateExecutor(self._cli_service, command_template.SHOW_BOARD).execute_command()
@@ -50,9 +48,7 @@ class AutoloadActions(object):
 
     def ports_table(self):
         """
-        Chassis table
-        :return: list of chassis data, [{'index': '1', 'model': 'MRV Chassis', 'serial': '1ndsKsf'}, ]
-        :rtype: list
+        :rtype: dict
         """
         port_table = {}
         port_logic_output = CommandTemplateExecutor(self._cli_service,
@@ -67,7 +63,7 @@ class AutoloadActions(object):
         for record in self._parse_table(port_output.strip(), r'^\w+\s+\d+\s+\d+\s+\d+\s+\w+.*$'):
             record_id = re.sub(r'[eE]', '', record[0])
             if record_id in port_table:
-                port_table[record_id]['locked'] = True if record[1] == '2' else False
+                port_table[record_id]['locked'] = record[1]
                 if len(record) > 7:
                     port_table[record_id]['connected'] = re.sub(r'[wW]', '', record[5])
                 else:

@@ -114,18 +114,6 @@
                 <TagName Name="Configuration"/>
             </Tags>
         </AttributeInfo>
-        <AttributeInfo xsi:type="LookupAttributeDetails" Name="Admin Lock" Type="Lookup" DefaultValue="1"
-                       IsReadOnly="true" IsCommand="true">
-            <Tags>
-                <TagName Name="Setting"/>
-                <TagName Name="Available For Abstract Resources"/>
-                <TagName Name="Variable Capability"/>
-            </Tags>
-            <LookupValues>
-                <LookupValue NumericValue="1" StringValue="Unlocked"/>
-                <LookupValue NumericValue="2" StringValue="Locked"/>
-            </LookupValues>
-        </AttributeInfo>
     </Attributes>
     <Modules>
         <Module Name="Measurement">
@@ -248,14 +236,10 @@
                         <AttachedAttribute Name="Port Speed" IsOverridable="true" IsLocal="false">
                             <AllowedValues/>
                         </AttachedAttribute>
-                        <AttachedAttribute Name="Admin Lock" IsOverridable="true" IsLocal="false">
-                            <AllowedValues/>
-                        </AttachedAttribute>
                     </AttachedAttributes>
                     <AttributeValues>
                         <AttributeValue Name="Protocol" Value="2"/>
                         <AttributeValue Name="Protocol Type" Value="0"/>
-                        <AttributeValue Name="Admin Lock" Value="1"/>
                     </AttributeValues>
                     <ParentModels>
                         <ParentModelName>Generic L1 Module</ParentModelName>

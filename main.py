@@ -14,7 +14,7 @@ from fiberzone_afm.driver_commands import DriverCommands
 SERVER_PORT = 1024
 
 if __name__ == '__main__':
-    driver_name = 'fiberzone_afm'
+    driver_name = 'fiberzone_afm_new'
 
     # Determining log path
     driver_path = os.path.dirname(sys.argv[0])

@@ -1,14 +1,13 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-import os
 
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
 from cloudshell.layer_one.core.response.response_info import GetStateIdResponseInfo, ResourceDescriptionResponseInfo, \
     AttributeValueResponseInfo
+from fiberzone_afm.cli.fiberzone_cli_handler import FiberzoneCliHandler
 from fiberzone_afm.command_actions.autoload_actions import AutoloadActions
 from fiberzone_afm.command_actions.mapping_actions import MappingActions
 from fiberzone_afm.helpers.autoload_helper import AutoloadHelper
-from fiberzone_afm.helpers.test_cli import TestCliHandler
 
 
 class DriverCommands(DriverCommandsInterface):
@@ -22,9 +21,9 @@ class DriverCommands(DriverCommandsInterface):
         :type logger: logging.Logger
         """
         self._logger = logger
-        # self._cli_handler = FiberzoneCliHandler(logger)
-        self._cli_handler = TestCliHandler(
-            os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
+        self._cli_handler = FiberzoneCliHandler(logger)
+        # self._cli_handler = TestCliHandler(
+        #     os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
 
         self.__ports_table = None
 
@@ -76,7 +75,7 @@ class DriverCommands(DriverCommandsInterface):
                 chassis_name = session.send_command('show chassis name')
                 return chassis_name
         """
-        return GetStateIdResponseInfo(-1)
+        return GetStateIdResponseInfo('-1')
 
     def set_state_id(self, state_id):
         """

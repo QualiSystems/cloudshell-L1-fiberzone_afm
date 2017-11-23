@@ -5,6 +5,7 @@ import re
 
 import fiberzone_afm.command_templates.autoload as command_template
 from cloudshell.cli.command_template.command_template_executor import CommandTemplateExecutor
+from fiberzone_afm.helpers.command_actions_helper import CommandActionsHelper
 
 
 class AutoloadActions(object):
@@ -54,28 +55,18 @@ class AutoloadActions(object):
         port_logic_output = CommandTemplateExecutor(self._cli_service,
                                                     command_template.PORT_SHOW_LOGIC_TABLE).execute_command()
 
-        for record in self._parse_table(port_logic_output.strip(), r'^\d+\s+\d+\s+\w+\s+\w+\s+\w+$'):
+        for record in CommandActionsHelper.parse_table(port_logic_output.strip(), r'^\d+\s+\d+\s+\w+\s+e\d+\s+w\d+$'):
             port_table[record[0]] = {'blade': record[2]}
 
         port_output = CommandTemplateExecutor(self._cli_service,
                                               command_template.PORT_SHOW).execute_command()
 
-        for record in self._parse_table(port_output.strip(), r'^\w+\s+\d+\s+\d+\s+\d+\s+\w+.*$'):
-            record_id = re.sub(r'[eE]', '', record[0])
+        for record in CommandActionsHelper.parse_table(port_output.strip(), r'^e\d+\s+\d+\s+\d+\s+\d+\s+w\d+\s+.*$'):
+            record_id = re.sub(r'\D', '', record[0])
             if record_id in port_table:
                 port_table[record_id]['locked'] = record[1]
                 if len(record) > 7:
-                    port_table[record_id]['connected'] = re.sub(r'[wW]', '', record[5])
+                    port_table[record_id]['connected'] = re.sub(r'\D', '', record[5])
                 else:
                     port_table[record_id]['connected'] = None
         return port_table
-
-    @staticmethod
-    def _parse_table(data, pattern):
-        compiled_pattern = re.compile(pattern, re.IGNORECASE)
-        table = []
-        for record in data.split('\n'):
-            matched = re.search(compiled_pattern, record.strip())
-            if matched:
-                table.append(re.split(r'\s+', matched.group(0)))
-        return table

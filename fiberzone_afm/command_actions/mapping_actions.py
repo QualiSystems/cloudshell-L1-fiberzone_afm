@@ -51,7 +51,7 @@ class MappingActions(object):
 
         for record in CommandActionsHelper.parse_table(port_output.strip(),
                                                        r'^e{0}\s+\d+\s+\d+\s+\d+\s+w{0}.*$'.format(port_id)):
-            if record[1] == 2:
+            if record[1] == '2':
                 return True
             else:
                 return False

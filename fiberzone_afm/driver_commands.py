@@ -216,7 +216,7 @@ class DriverCommands(DriverCommandsInterface):
                 raise Exception(self.__class__.__name__,
                                 'Src Port {0} connected to incorrect Dst Port {1}'.format(src_port_id,
                                                                                           connected_dst_id))
-            
+
             if mapping_actions.port_locked(src_port_id) or mapping_actions.port_locked(dst_port_id):
                 raise Exception(self.__class__.__name__,
                                 'Port {0} or port {1} is locked'.format(src_port_id, dst_port_id))
@@ -322,7 +322,10 @@ class DriverCommands(DriverCommandsInterface):
                 session.send_command(command)
                 return AttributeValueResponseInfo(attribute_value)
         """
-        pass
+        if attribute_name == 'Serial Number':
+            return
+        else:
+            raise Exception(self.__class__.__name__, 'SetAttribute {} is not supported'.format(attribute_name))
 
     def map_tap(self, src_port, dst_ports):
         return self.map_uni(src_port, dst_ports)

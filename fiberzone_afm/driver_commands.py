@@ -158,8 +158,8 @@ class DriverCommands(DriverCommandsInterface):
         with self._cli_handler.default_mode_service() as session:
             autoload_actions = AutoloadActions(session, self._logger)
             board_table = autoload_actions.board_table()
-            self.__ports_table = autoload_actions.ports_table()
-            autoload_helper = AutoloadHelper(address, board_table, self.__ports_table, self._logger)
+            ports_table = autoload_actions.ports_table()
+            autoload_helper = AutoloadHelper(address, board_table, ports_table, self._logger)
             response_info = ResourceDescriptionResponseInfo(autoload_helper.build_structure())
             return response_info
 

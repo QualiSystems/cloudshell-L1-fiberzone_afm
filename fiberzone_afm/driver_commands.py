@@ -171,7 +171,7 @@ class DriverCommands(DriverCommandsInterface):
             mapping_actions = MappingActions(session, self._logger)
             if mapping_actions.port_connected(src_port_id) or mapping_actions.port_connected(dst_port_id):
                 raise Exception(self.__class__.__name__,
-                                'Port {0}, or port {1} have already been connected'.format(src_port_id, dst_port_id))
+                                'Port {0}, or port {1} has already been connected'.format(src_port_id, dst_port_id))
             if mapping_actions.port_locked(src_port_id) or mapping_actions.port_locked(dst_port_id):
                 raise Exception(self.__class__.__name__,
                                 'Port {0} or port {1} is locked'.format(src_port_id, dst_port_id))
@@ -197,14 +197,26 @@ class DriverCommands(DriverCommandsInterface):
             if len(ports) == 1:
                 src_port_id = ports[0]
                 dst_port_id = mapping_actions.port_connected(src_port_id)
+                if not dst_port_id:
+                    return
             else:
                 src_port_id = ports[0]
                 dst_port_id = ports[1]
 
-            if mapping_actions.port_connected(src_port_id) != dst_port_id or mapping_actions.port_connected(
-                    dst_port_id) != src_port_id:
+            connected_dst_id = mapping_actions.port_connected(src_port_id)
+            connected_src_id = mapping_actions.port_connected(dst_port_id)
+
+            if not connected_src_id and not connected_dst_id:
+                return
+            elif connected_src_id and connected_src_id != src_port_id:
                 raise Exception(self.__class__.__name__,
-                                'Port {0}, or port {1} is not connected'.format(src_port_id, dst_port_id))
+                                'Dst Port {0} connected to incorrect Src Port {1}'.format(dst_port_id,
+                                                                                          connected_src_id))
+            elif connected_dst_id and connected_dst_id != dst_port_id:
+                raise Exception(self.__class__.__name__,
+                                'Src Port {0} connected to incorrect Dst Port {1}'.format(src_port_id,
+                                                                                          connected_dst_id))
+            
             if mapping_actions.port_locked(src_port_id) or mapping_actions.port_locked(dst_port_id):
                 raise Exception(self.__class__.__name__,
                                 'Port {0} or port {1} is locked'.format(src_port_id, dst_port_id))

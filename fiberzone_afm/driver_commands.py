@@ -1,14 +1,16 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-import os
+
+import time
 
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
+from cloudshell.layer_one.core.helper.runtime_configuration import RuntimeConfiguration
 from cloudshell.layer_one.core.response.response_info import GetStateIdResponseInfo, ResourceDescriptionResponseInfo, \
     AttributeValueResponseInfo
+from fiberzone_afm.cli.fiberzone_cli_handler import FiberzoneCliHandler
 from fiberzone_afm.command_actions.autoload_actions import AutoloadActions
 from fiberzone_afm.command_actions.mapping_actions import MappingActions
 from fiberzone_afm.helpers.autoload_helper import AutoloadHelper
-from fiberzone_afm.helpers.test_cli import TestCliHandler
 
 
 class DriverCommands(DriverCommandsInterface):
@@ -22,22 +24,11 @@ class DriverCommands(DriverCommandsInterface):
         :type logger: logging.Logger
         """
         self._logger = logger
-        # self._cli_handler = FiberzoneCliHandler(logger)
-        self._cli_handler = TestCliHandler(
-            os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
+        self._cli_handler = FiberzoneCliHandler(logger)
+        # self._cli_handler = TestCliHandler(
+        #     os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
 
-        self.__ports_table = None
-
-    @property
-    def _ports_table(self):
-        """
-        :rtype: dict
-        """
-        if not self.__ports_table:
-            with self._cli_handler.default_mode_service() as session:
-                autoload_actions = AutoloadActions(session, self._logger)
-                self.__ports_table = autoload_actions.ports_table()
-        return self.__ports_table
+        self._mapping_timeout = RuntimeConfiguration().read_key('MAPPING.TIMEOUT')
 
     def login(self, address, username, password):
         """
@@ -76,7 +67,7 @@ class DriverCommands(DriverCommandsInterface):
                 chassis_name = session.send_command('show chassis name')
                 return chassis_name
         """
-        return GetStateIdResponseInfo(-1)
+        return GetStateIdResponseInfo('-1')
 
     def set_state_id(self, state_id):
         """
@@ -166,8 +157,8 @@ class DriverCommands(DriverCommandsInterface):
         with self._cli_handler.default_mode_service() as session:
             autoload_actions = AutoloadActions(session, self._logger)
             board_table = autoload_actions.board_table()
-            self.__ports_table = autoload_actions.ports_table()
-            autoload_helper = AutoloadHelper(address, board_table, self.__ports_table, self._logger)
+            ports_table = autoload_actions.ports_table()
+            autoload_helper = AutoloadHelper(address, board_table, ports_table, self._logger)
             response_info = ResourceDescriptionResponseInfo(autoload_helper.build_structure())
             return response_info
 
@@ -175,40 +166,75 @@ class DriverCommands(DriverCommandsInterface):
     def _convert_port(cs_port):
         return cs_port.split('/')[-1]
 
-    def _validate_port(self, port_id):
-        port_id = str(port_id)
-        port_data = self._ports_table.get(port_id)
-        if port_data:
-            if port_data.get('locked') == '2':
-                raise Exception(self.__class__.__name__, 'Port Admin Lock state is Locked')
-        else:
-            raise Exception(self.__class__.__name__, 'Port "{}"does not exist'.format(port_id))
-
-    def _paired_port(self, port_id):
-        port_id = str(port_id)
-        port_data = self._ports_table.get(port_id)
-        if port_data:
-            return port_data.get('connected')
-        else:
-            raise Exception(self.__class__.__name__, 'Port "{}" does not exist'.format(port_id))
-
     def _connect_ports(self, src_port_id, dst_port_id):
-        self._validate_port(src_port_id)
-        self._validate_port(dst_port_id)
         with self._cli_handler.default_mode_service() as session:
             mapping_actions = MappingActions(session, self._logger)
+            if mapping_actions.port_connected(src_port_id) or mapping_actions.port_connected(dst_port_id):
+                raise Exception(self.__class__.__name__,
+                                'Port {0}, or port {1} has already been connected'.format(src_port_id, dst_port_id))
+            if mapping_actions.port_locked(src_port_id) or mapping_actions.port_locked(dst_port_id):
+                raise Exception(self.__class__.__name__,
+                                'Port {0} or port {1} is locked'.format(src_port_id, dst_port_id))
             mapping_actions.connect(src_port_id, dst_port_id)
-            self._ports_table.get(src_port_id)['connected'] = dst_port_id
-            self._ports_table.get(dst_port_id)['connected'] = src_port_id
+            start_time = time.time()
+            while time.time() - start_time < self._mapping_timeout:
+                if not mapping_actions.port_locked(src_port_id) and not mapping_actions.port_locked(dst_port_id):
+                    if mapping_actions.port_connected(src_port_id) == dst_port_id and mapping_actions.port_connected(
+                            dst_port_id) == src_port_id:
+                        return
+                    else:
+                        time.sleep(5)
+                else:
+                    raise Exception(self.__class__.__name__,
+                                    'Port {0} or port {1} has been locked'.format(src_port_id, dst_port_id))
+            raise Exception(self.__class__.__name__,
+                            'Cannot connect {0} to {1} during {2}sec'.format(src_port_id, dst_port_id,
+                                                                             self._mapping_timeout))
 
-    def _disconnect_ports(self, src_port_id, dst_port_id):
-        self._validate_port(src_port_id)
-        self._validate_port(dst_port_id)
+    def _disconnect_ports(self, *ports):
         with self._cli_handler.default_mode_service() as session:
             mapping_actions = MappingActions(session, self._logger)
+            if len(ports) == 1:
+                src_port_id = ports[0]
+                dst_port_id = mapping_actions.port_connected(src_port_id)
+                if not dst_port_id:
+                    return
+            else:
+                src_port_id = ports[0]
+                dst_port_id = ports[1]
+
+            connected_dst_id = mapping_actions.port_connected(src_port_id)
+            connected_src_id = mapping_actions.port_connected(dst_port_id)
+
+            if not connected_src_id and not connected_dst_id:
+                return
+            elif connected_src_id and connected_src_id != src_port_id:
+                raise Exception(self.__class__.__name__,
+                                'Dst Port {0} connected to incorrect Src Port {1}'.format(dst_port_id,
+                                                                                          connected_src_id))
+            elif connected_dst_id and connected_dst_id != dst_port_id:
+                raise Exception(self.__class__.__name__,
+                                'Src Port {0} connected to incorrect Dst Port {1}'.format(src_port_id,
+                                                                                          connected_dst_id))
+
+            if mapping_actions.port_locked(src_port_id) or mapping_actions.port_locked(dst_port_id):
+                raise Exception(self.__class__.__name__,
+                                'Port {0} or port {1} is locked'.format(src_port_id, dst_port_id))
             mapping_actions.disconnect(src_port_id, dst_port_id)
-            self._ports_table.get(src_port_id)['connected'] = None
-            self._ports_table.get(dst_port_id)['connected'] = None
+            start_time = time.time()
+            while time.time() - start_time < self._mapping_timeout:
+                if not mapping_actions.port_locked(src_port_id) and not mapping_actions.port_locked(dst_port_id):
+                    if not mapping_actions.port_connected(src_port_id) and not mapping_actions.port_connected(
+                            dst_port_id):
+                        return
+                    else:
+                        time.sleep(5)
+                else:
+                    raise Exception(self.__class__.__name__,
+                                    'Port {0} or port {1} has been locked'.format(src_port_id, dst_port_id))
+            raise Exception(self.__class__.__name__,
+                            'Cannot disconnect {0} from {1} during {2}sec'.format(src_port_id, dst_port_id,
+                                                                                  self._mapping_timeout))
 
     def map_clear(self, ports):
         """
@@ -225,9 +251,7 @@ class DriverCommands(DriverCommandsInterface):
         """
         for src_port in ports:
             src_port_id = self._convert_port(src_port)
-            dst_port_id = self._paired_port(src_port_id)
-            if dst_port_id:
-                self._disconnect_ports(src_port_id, dst_port_id)
+            self._disconnect_ports(src_port_id)
 
     def map_clear_to(self, src_port, dst_ports):
         """
@@ -298,7 +322,10 @@ class DriverCommands(DriverCommandsInterface):
                 session.send_command(command)
                 return AttributeValueResponseInfo(attribute_value)
         """
-        raise NotImplementedError
+        if attribute_name == 'Serial Number':
+            return
+        else:
+            raise Exception(self.__class__.__name__, 'SetAttribute {} is not supported'.format(attribute_name))
 
     def map_tap(self, src_port, dst_ports):
         return self.map_uni(src_port, dst_ports)

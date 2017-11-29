@@ -1,17 +1,16 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os
 import time
 
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
 from cloudshell.layer_one.core.helper.runtime_configuration import RuntimeConfiguration
 from cloudshell.layer_one.core.response.response_info import GetStateIdResponseInfo, ResourceDescriptionResponseInfo, \
     AttributeValueResponseInfo
+from fiberzone_afm.cli.fiberzone_cli_handler import FiberzoneCliHandler
 from fiberzone_afm.command_actions.autoload_actions import AutoloadActions
 from fiberzone_afm.command_actions.mapping_actions import MappingActions
 from fiberzone_afm.helpers.autoload_helper import AutoloadHelper
-from fiberzone_afm.helpers.test_cli import TestCliHandler
 
 
 class DriverCommands(DriverCommandsInterface):
@@ -25,9 +24,9 @@ class DriverCommands(DriverCommandsInterface):
         :type logger: logging.Logger
         """
         self._logger = logger
-        # self._cli_handler = FiberzoneCliHandler(logger)
-        self._cli_handler = TestCliHandler(
-            os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
+        self._cli_handler = FiberzoneCliHandler(logger)
+        # self._cli_handler = TestCliHandler(
+        #     os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
 
         self._mapping_timeout = RuntimeConfiguration().read_key('MAPPING.TIMEOUT')
         self._mapping_check_delay = RuntimeConfiguration().read_key('MAPPING.CHECK_DELAY')
@@ -203,11 +202,11 @@ class DriverCommands(DriverCommandsInterface):
             mapping_actions = MappingActions(session, self._logger)
             if len(ports) == 1:
                 src_port_id = ports[0]
-                src_port_info = mapping_actions.ports_info(src_port_id)[0]
+                src_port_info, = mapping_actions.ports_info(src_port_id)
                 dst_port_id = src_port_info.get('connected')
                 if not dst_port_id:
                     return
-                dst_port_info = mapping_actions.ports_info(dst_port_id)
+                dst_port_info, = mapping_actions.ports_info(dst_port_id)
             else:
                 src_port_id = ports[0]
                 dst_port_id = ports[1]

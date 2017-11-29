@@ -45,23 +45,22 @@ class MappingActions(object):
             dst_port=dst_port)
         return output
 
-    def port_locked(self, port_id):
+    def ports_info(self, *port_ids):
+        self._logger.debug('Getting ports info for ports {}'.format(', '.join(port_ids)))
         port_output = CommandTemplateExecutor(self._cli_service,
                                               command_template_autoload.PORT_SHOW).execute_command()
+        ports_info = []
 
-        for record in CommandActionsHelper.parse_table(port_output.strip(),
-                                                       r'^e{0}\s+\d+\s+\d+\s+\d+\s+w{0}.*$'.format(port_id)):
-            if record[1] == '2':
-                return True
+        for port_id in port_ids:
+            pattern = r'^e{0}\s+\d+\s+\d+\s+\d+\s+w{0}.*$'.format(port_id)
+            match_list = CommandActionsHelper.parse_table(port_output.strip(), pattern)
+            if len(match_list) == 1:
+                record = match_list[0]
+                port_info = {'id': port_id,
+                             'connected': re.sub(r'\D', '', record[5], re.IGNORECASE) if record[2] == '2' else None,
+                             'locked': record[1] == '2',
+                             'disabled': record[3] == '2'}
+                ports_info.append(port_info)
             else:
-                return False
-        raise Exception(self.__class__.__name__, "Cannot find port {}".format(port_id))
-
-    def port_connected(self, port_id):
-        port_connected_output = CommandTemplateExecutor(self._cli_service,
-                                                        command_template.CONNECTIONS).execute_command()
-
-        for record in CommandActionsHelper.parse_table(port_connected_output.strip(),
-                                                       r'^e{}\s+w\d+\s+\w+\d+\s+.*$'.format(port_id)):
-            port_id = re.sub(r'\D', '', record[1], re.IGNORECASE)
-            return port_id
+                raise Exception(self.__class__.__name__, 'Cannot find port with id {}'.format(port_id))
+        return ports_info

@@ -1,16 +1,17 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import os
 import time
 
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
 from cloudshell.layer_one.core.helper.runtime_configuration import RuntimeConfiguration
 from cloudshell.layer_one.core.response.response_info import GetStateIdResponseInfo, ResourceDescriptionResponseInfo, \
     AttributeValueResponseInfo
-from fiberzone_afm.cli.fiberzone_cli_handler import FiberzoneCliHandler
 from fiberzone_afm.command_actions.autoload_actions import AutoloadActions
 from fiberzone_afm.command_actions.mapping_actions import MappingActions
 from fiberzone_afm.helpers.autoload_helper import AutoloadHelper
+from fiberzone_afm.helpers.test_cli import TestCliHandler
 
 
 class DriverCommands(DriverCommandsInterface):
@@ -24,11 +25,12 @@ class DriverCommands(DriverCommandsInterface):
         :type logger: logging.Logger
         """
         self._logger = logger
-        self._cli_handler = FiberzoneCliHandler(logger)
-        # self._cli_handler = TestCliHandler(
-        #     os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
+        # self._cli_handler = FiberzoneCliHandler(logger)
+        self._cli_handler = TestCliHandler(
+            os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
 
         self._mapping_timeout = RuntimeConfiguration().read_key('MAPPING.TIMEOUT')
+        self._mapping_check_delay = RuntimeConfiguration().read_key('MAPPING.CHECK_DELAY')
 
     def login(self, address, username, password):
         """
@@ -100,6 +102,7 @@ class DriverCommands(DriverCommandsInterface):
                 session.send_command('map bidir {0} {1}'.format(convert_port(src_port), convert_port(dst_port)))
 
         """
+        self._logger.info('MapBidi, SrcPort: {0}, DstPort: {1}'.format(src_port, dst_port))
         src_port_id = self._convert_port(src_port)
         dst_port_id = self._convert_port(dst_port)
         self._connect_ports(src_port_id, dst_port_id)
@@ -166,75 +169,74 @@ class DriverCommands(DriverCommandsInterface):
     def _convert_port(cs_port):
         return cs_port.split('/')[-1]
 
+    def _check_port_locked_or_disabled(self, port_id, port_info):
+        if port_info.get('locked'):
+            raise Exception(self.__class__.__name__, 'Port {} is locked'.format(port_id))
+        if port_info.get('disabled'):
+            raise Exception(self.__class__.__name__, 'Port {} is disabled'.format(port_id))
+
     def _connect_ports(self, src_port_id, dst_port_id):
         with self._cli_handler.default_mode_service() as session:
             mapping_actions = MappingActions(session, self._logger)
-            if mapping_actions.port_connected(src_port_id) or mapping_actions.port_connected(dst_port_id):
+            src_port_info, dst_port_info = mapping_actions.ports_info(src_port_id, dst_port_id)
+            self._check_port_locked_or_disabled(src_port_id, src_port_info)
+            self._check_port_locked_or_disabled(dst_port_id, dst_port_info)
+            if src_port_info.get('connected') or dst_port_info.get('connected'):
                 raise Exception(self.__class__.__name__,
                                 'Port {0}, or port {1} has already been connected'.format(src_port_id, dst_port_id))
-            if mapping_actions.port_locked(src_port_id) or mapping_actions.port_locked(dst_port_id):
-                raise Exception(self.__class__.__name__,
-                                'Port {0} or port {1} is locked'.format(src_port_id, dst_port_id))
             mapping_actions.connect(src_port_id, dst_port_id)
             start_time = time.time()
             while time.time() - start_time < self._mapping_timeout:
-                if not mapping_actions.port_locked(src_port_id) and not mapping_actions.port_locked(dst_port_id):
-                    if mapping_actions.port_connected(src_port_id) == dst_port_id and mapping_actions.port_connected(
-                            dst_port_id) == src_port_id:
-                        return
-                    else:
-                        time.sleep(5)
+                src_port_info, dst_port_info = mapping_actions.ports_info(src_port_id, dst_port_id)
+                self._check_port_locked_or_disabled(src_port_id, src_port_info)
+                self._check_port_locked_or_disabled(dst_port_id, dst_port_info)
+                if src_port_info.get('connected') == dst_port_id and dst_port_info.get('connected') == src_port_id:
+                    return
                 else:
-                    raise Exception(self.__class__.__name__,
-                                    'Port {0} or port {1} has been locked'.format(src_port_id, dst_port_id))
+                    time.sleep(self._mapping_check_delay)
             raise Exception(self.__class__.__name__,
-                            'Cannot connect {0} to {1} during {2}sec'.format(src_port_id, dst_port_id,
-                                                                             self._mapping_timeout))
+                            'Cannot connect port {0} to port {1} during {2}sec'.format(src_port_id, dst_port_id,
+                                                                                       self._mapping_timeout))
 
     def _disconnect_ports(self, *ports):
         with self._cli_handler.default_mode_service() as session:
             mapping_actions = MappingActions(session, self._logger)
             if len(ports) == 1:
                 src_port_id = ports[0]
-                dst_port_id = mapping_actions.port_connected(src_port_id)
+                src_port_info = mapping_actions.ports_info(src_port_id)[0]
+                dst_port_id = src_port_info.get('connected')
                 if not dst_port_id:
                     return
+                dst_port_info = mapping_actions.ports_info(dst_port_id)
             else:
                 src_port_id = ports[0]
                 dst_port_id = ports[1]
+                src_port_info, dst_port_info = mapping_actions.ports_info(src_port_id, dst_port_id)
 
-            connected_dst_id = mapping_actions.port_connected(src_port_id)
-            connected_src_id = mapping_actions.port_connected(dst_port_id)
+            self._check_port_locked_or_disabled(src_port_id, src_port_info)
+            self._check_port_locked_or_disabled(dst_port_id, dst_port_info)
 
-            if not connected_src_id and not connected_dst_id:
-                return
-            elif connected_src_id and connected_src_id != src_port_id:
-                raise Exception(self.__class__.__name__,
-                                'Dst Port {0} connected to incorrect Src Port {1}'.format(dst_port_id,
-                                                                                          connected_src_id))
-            elif connected_dst_id and connected_dst_id != dst_port_id:
-                raise Exception(self.__class__.__name__,
-                                'Src Port {0} connected to incorrect Dst Port {1}'.format(src_port_id,
-                                                                                          connected_dst_id))
+            if src_port_info.get('connected') != dst_port_id:
+                raise Exception(
+                    'Port {0} is not connected or connected not to port {1}'.format(src_port_id, dst_port_id))
 
-            if mapping_actions.port_locked(src_port_id) or mapping_actions.port_locked(dst_port_id):
-                raise Exception(self.__class__.__name__,
-                                'Port {0} or port {1} is locked'.format(src_port_id, dst_port_id))
+            if dst_port_info.get('connected') != src_port_id:
+                raise Exception(
+                    'Port {0} is not connected or connected not to port {1}'.format(dst_port_id, src_port_id))
+
             mapping_actions.disconnect(src_port_id, dst_port_id)
             start_time = time.time()
             while time.time() - start_time < self._mapping_timeout:
-                if not mapping_actions.port_locked(src_port_id) and not mapping_actions.port_locked(dst_port_id):
-                    if not mapping_actions.port_connected(src_port_id) and not mapping_actions.port_connected(
-                            dst_port_id):
-                        return
-                    else:
-                        time.sleep(5)
+                src_port_info, dst_port_info = mapping_actions.ports_info(src_port_id, dst_port_id)
+                self._check_port_locked_or_disabled(src_port_id, src_port_info)
+                self._check_port_locked_or_disabled(dst_port_id, dst_port_info)
+                if not src_port_info.get('connected') and not dst_port_info.get('connected'):
+                    return
                 else:
-                    raise Exception(self.__class__.__name__,
-                                    'Port {0} or port {1} has been locked'.format(src_port_id, dst_port_id))
+                    time.sleep(self._mapping_check_delay)
             raise Exception(self.__class__.__name__,
-                            'Cannot disconnect {0} from {1} during {2}sec'.format(src_port_id, dst_port_id,
-                                                                                  self._mapping_timeout))
+                            'Cannot disconnect port {0} from port {1} during {2}sec'.format(src_port_id, dst_port_id,
+                                                                                            self._mapping_timeout))
 
     def map_clear(self, ports):
         """
@@ -249,6 +251,7 @@ class DriverCommands(DriverCommandsInterface):
             for port in ports:
                 session.send_command('map clear {}'.format(convert_port(port)))
         """
+        self._logger.info('MapClear, Ports: {}'.format(', '.join(ports)))
         for src_port in ports:
             src_port_id = self._convert_port(src_port)
             self._disconnect_ports(src_port_id)
@@ -272,6 +275,7 @@ class DriverCommands(DriverCommandsInterface):
         """
         if len(dst_ports) != 1:
             raise Exception(self.__class__.__name__, 'MapClearTo operation is not allowed for multiple Dst ports')
+        self._logger.info('MapClearTo, SrcPort: {0}, DstPort: {1}'.format(src_port, dst_ports[0]))
         src_port_id = self._convert_port(src_port)
         dst_port_id = self._convert_port(dst_ports[0])
         self._disconnect_ports(src_port_id, dst_port_id)

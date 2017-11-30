@@ -1,7 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import os
 import time
 
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
@@ -12,7 +11,6 @@ from fiberzone_afm.cli.fiberzone_cli_handler import FiberzoneCliHandler
 from fiberzone_afm.command_actions.autoload_actions import AutoloadActions
 from fiberzone_afm.command_actions.mapping_actions import MappingActions
 from fiberzone_afm.helpers.autoload_helper import AutoloadHelper
-from fiberzone_afm.helpers.test_cli import TestCliHandler
 
 
 class PortsPartiallyConnectedException(Exception):
@@ -296,9 +294,19 @@ class DriverCommands(DriverCommandsInterface):
                 session.send_command('map clear {}'.format(convert_port(port)))
         """
         self._logger.info('MapClear, Ports: {}'.format(', '.join(ports)))
+        exception_messages = []
         for src_port in ports:
-            src_port_id = self._convert_port(src_port)
-            self._disconnect_ports(src_port_id)
+            try:
+                src_port_id = self._convert_port(src_port)
+                self._disconnect_ports(src_port_id)
+            except Exception as e:
+                if len(e.args) > 1:
+                    exception_messages.append(e.args[1])
+                elif len(e.args) == 1:
+                    exception_messages.append(e.args[0])
+
+        if exception_messages:
+            raise Exception(self.__class__.__name__, ', '.join(exception_messages))
 
     def map_clear_to(self, src_port, dst_ports):
         """

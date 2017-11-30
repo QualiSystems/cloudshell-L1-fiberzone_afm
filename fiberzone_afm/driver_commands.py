@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import os
 import time
 
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
@@ -11,6 +12,7 @@ from fiberzone_afm.cli.fiberzone_cli_handler import FiberzoneCliHandler
 from fiberzone_afm.command_actions.autoload_actions import AutoloadActions
 from fiberzone_afm.command_actions.mapping_actions import MappingActions
 from fiberzone_afm.helpers.autoload_helper import AutoloadHelper
+from fiberzone_afm.helpers.test_cli import TestCliHandler
 
 
 class PortsPartiallyConnectedException(Exception):
@@ -248,8 +250,8 @@ class DriverCommands(DriverCommandsInterface):
                 dst_port_id = ports[1]
                 src_port_info, dst_port_info = mapping_actions.ports_info(src_port_id, dst_port_id)
 
-            self._check_port_locked_or_disabled(src_port_info)
-            self._check_port_locked_or_disabled(dst_port_info)
+            if not self._get_connected_port(src_port_info) and not self._get_connected_port(dst_port_info):
+                return
 
             if self._get_connected_port(src_port_info) != dst_port_id:
                 raise Exception(
@@ -258,6 +260,9 @@ class DriverCommands(DriverCommandsInterface):
             if self._get_connected_port(dst_port_info) != src_port_id:
                 raise Exception(
                     'Port {0} is not connected or connected not to port {1}'.format(dst_port_id, src_port_id))
+
+            self._check_port_locked_or_disabled(src_port_info)
+            self._check_port_locked_or_disabled(dst_port_info)
 
             mapping_actions.disconnect(src_port_id, dst_port_id)
             start_time = time.time()

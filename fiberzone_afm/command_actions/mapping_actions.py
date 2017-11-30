@@ -3,6 +3,7 @@ import re
 import fiberzone_afm.command_templates.autoload as command_template_autoload
 import fiberzone_afm.command_templates.mapping as command_template
 from cloudshell.cli.command_template.command_template_executor import CommandTemplateExecutor
+from fiberzone_afm.entities.port_entities import Port, PortInfo
 from fiberzone_afm.helpers.command_actions_helper import CommandActionsHelper
 
 
@@ -52,15 +53,24 @@ class MappingActions(object):
         ports_info = []
 
         for port_id in port_ids:
-            pattern = r'^e{0}\s+\d+\s+\d+\s+\d+\s+w{0}.*$'.format(port_id)
+            pattern = r'^\D{0}\s+\d+\s+\d+\s+\d+\s+\D{0}.*$'.format(port_id)
             match_list = CommandActionsHelper.parse_table(port_output.strip(), pattern)
-            if len(match_list) == 1:
-                record = match_list[0]
-                port_info = {'id': port_id,
-                             'connected': re.sub(r'\D', '', record[5], re.IGNORECASE) if record[2] == '2' else None,
-                             'locked': record[1] == '2',
-                             'disabled': record[3] == '2'}
-                ports_info.append(port_info)
+            east_port = None
+            west_port = None
+            for record in match_list:
+                name = record[0]
+                connected = re.sub(r'\D', '', record[5]) if record[2] == '2' else None
+                locked = record[1] == '2'
+                disabled = record[3] == '2'
+                paired = record[4]
+                port = Port(name, paired, connected, locked, disabled)
+                if re.match(r'e', port.name, re.IGNORECASE):
+                    east_port = port
+                elif re.match(r'w', port.name, re.IGNORECASE):
+                    west_port = port
+            if east_port and west_port:
+                ports_info.append(PortInfo(port_id, east_port, west_port))
             else:
-                raise Exception(self.__class__.__name__, 'Cannot find port with id {}'.format(port_id))
+                raise Exception(self.__class__.__name__, 'Cannot collect information for port {}'.format(port_id))
+
         return ports_info

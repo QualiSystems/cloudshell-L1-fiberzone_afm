@@ -32,9 +32,8 @@ if __name__ == '__main__':
     # Creating command logger instance
     command_logger = get_qs_logger(log_group=driver_name,
                                    log_file_prefix=driver_name + '_commands', log_category='COMMANDS')
-    log_level = runtime_config.read_key('LOGGING.LEVEL')
-    if log_level:
-        command_logger.setLevel(log_level)
+    log_level = runtime_config.read_key('LOGGING.LEVEL', 'INFO')
+    command_logger.setLevel(log_level)
 
     command_logger.debug('Starting driver {}'.format(driver_name))
 

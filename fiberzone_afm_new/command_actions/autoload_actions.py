@@ -3,9 +3,9 @@
 
 import re
 
-import fiberzone_afm.command_templates.autoload as command_template
+import fiberzone_afm_new.command_templates.autoload as command_template
 from cloudshell.cli.command_template.command_template_executor import CommandTemplateExecutor
-from fiberzone_afm.helpers.command_actions_helper import CommandActionsHelper
+from fiberzone_afm_new.helpers.command_actions_helper import CommandActionsHelper
 
 
 class AutoloadActions(object):
@@ -55,8 +55,8 @@ class AutoloadActions(object):
         port_logic_output = CommandTemplateExecutor(self._cli_service,
                                                     command_template.PORT_SHOW_LOGIC_TABLE).execute_command()
 
-        for record in CommandActionsHelper.parse_table(port_logic_output.strip(), r'^\d+\s+\d+\s+\w+\s+e\d+\s+w\d+$'):
-            port_table[record[0]] = {'blade': record[2]}
+        for record in CommandActionsHelper.parse_table(port_logic_output.strip(), r'^\w+\s+\d+\s+\w+\s+e\d+\s+w\d+$'):
+            port_table[record[1]] = {'blade': record[2]}
 
         port_output = CommandTemplateExecutor(self._cli_service,
                                               command_template.PORT_SHOW).execute_command()

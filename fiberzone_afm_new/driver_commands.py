@@ -2,15 +2,17 @@
 # -*- coding: utf-8 -*-
 
 import time
+import os
 
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
 from cloudshell.layer_one.core.helper.runtime_configuration import RuntimeConfiguration
 from cloudshell.layer_one.core.response.response_info import GetStateIdResponseInfo, ResourceDescriptionResponseInfo, \
     AttributeValueResponseInfo
-from fiberzone_afm.cli.fiberzone_cli_handler import FiberzoneCliHandler
-from fiberzone_afm.command_actions.autoload_actions import AutoloadActions
-from fiberzone_afm.command_actions.mapping_actions import MappingActions
-from fiberzone_afm.helpers.autoload_helper import AutoloadHelper
+from fiberzone_afm_new.cli.fiberzone_cli_handler import FiberzoneCliHandler
+from fiberzone_afm_new.command_actions.autoload_actions import AutoloadActions
+from fiberzone_afm_new.command_actions.mapping_actions import MappingActions
+from fiberzone_afm_new.helpers.autoload_helper import AutoloadHelper
+from fiberzone_afm_new.helpers.test_cli import TestCliHandler
 
 
 class PortsPartiallyConnectedException(Exception):
@@ -30,7 +32,7 @@ class DriverCommands(DriverCommandsInterface):
         self._logger = logger
         self._cli_handler = FiberzoneCliHandler(logger)
         # self._cli_handler = TestCliHandler(
-        #     os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
+        #      os.path.join(os.path.dirname(__file__), 'helpers', 'test_fiberzone_data'), logger)
 
         self._mapping_timeout = RuntimeConfiguration().read_key('MAPPING.TIMEOUT')
         self._mapping_check_delay = RuntimeConfiguration().read_key('MAPPING.CHECK_DELAY')

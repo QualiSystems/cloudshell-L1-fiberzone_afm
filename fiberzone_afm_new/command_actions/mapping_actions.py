@@ -1,10 +1,10 @@
 import re
 
-import fiberzone_afm.command_templates.autoload as command_template_autoload
-import fiberzone_afm.command_templates.mapping as command_template
+import fiberzone_afm_new.command_templates.autoload as command_template_autoload
+import fiberzone_afm_new.command_templates.mapping as command_template
 from cloudshell.cli.command_template.command_template_executor import CommandTemplateExecutor
-from fiberzone_afm.entities.port_entities import Port, PortInfo
-from fiberzone_afm.helpers.command_actions_helper import CommandActionsHelper
+from fiberzone_afm_new.entities.port_entities import Port, PortInfo
+from fiberzone_afm_new.helpers.command_actions_helper import CommandActionsHelper
 
 
 class MappingActions(object):

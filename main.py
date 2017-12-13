@@ -34,7 +34,7 @@ class Main(object):
         log_level = runtime_config.read_key('LOGGING.LEVEL', 'INFO')
         command_logger.setLevel(log_level)
 
-        command_logger.debug('Starting driver {}'.format(driver_name))
+        command_logger.info('Starting driver {0} on port {1}, PID: {2}'.format(driver_name, self._port, os.getpid()))
 
         # Importing and creating driver commands instance
         driver_commands = importlib.import_module('{}.driver_commands'.format(driver_name), package=None)

@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from mock import patch, Mock
+from mock import patch, Mock, call
 
 from main import Main
 
@@ -46,21 +46,59 @@ class TestMain(TestCase):
         self.assertIs(instance._log_path, self._log_path)
         self.assertIs(os_mod.environ.get('LOG_PATH'), self._log_path)
 
-    # @patch('main.os')
-    # @patch('main.importlib')
-    # @patch('main.datetime')
-    # @patch('main.RuntimeConfiguration')
-    # @patch('main.XMLLogger')
-    # @patch('main.get_qs_logger')
-    # @patch('main.DriverCommands')
-    # @patch('main.CommandExecutor')
-    # @patch('main.DriverListener')
-    # def test_run_driver(self, driver_listener_class, command_executor_class, driver_commands_class,
-    #                     get_qs_logger_mod, xml_logger_class, runtime_configuration_class, datetime_mod, importlib_mod, os_mod):
-    #     config_path = Mock()
-    #     xml_log_path = Mock()
-    #     os_mod.path.join.side_effect = [config_path, xml_log_path]
-    #     runtime_config_instance = Mock()
-    #     runtime_configuration_class.return_value = runtime_config_instance
-    #     driver_name = Mock()
-    #     self._instance.run_driver(driver_name)
+    @patch('main.os')
+    @patch('main.importlib')
+    @patch('main.datetime')
+    @patch('main.RuntimeConfiguration')
+    @patch('main.XMLLogger')
+    @patch('main.get_qs_logger')
+    @patch('main.CommandExecutor')
+    @patch('main.DriverListener')
+    def test_run_driver(self, driver_listener_class, command_executor_class,
+                        get_qs_logger_mod, xml_logger_class, runtime_configuration_class, datetime_mod, importlib_mod,
+                        os_mod):
+        config_path = Mock()
+        xml_log_path = Mock()
+        os_mod.path.join.side_effect = [config_path, xml_log_path]
+        runtime_config_instance = Mock()
+        log_level = Mock()
+        runtime_config_instance.read_key.return_value = log_level
+        runtime_configuration_class.return_value = runtime_config_instance
+        xml_logger_inst = Mock()
+        xml_logger_class.return_value = xml_logger_inst
+        driver_name = 'test driver'
+        time_inst = Mock()
+        datetime_mod.now.return_value = time_inst
+        time = 'test_time'
+        time_inst.strftime.return_value = time
+        command_logger = Mock()
+        get_qs_logger_mod.return_value = command_logger
+
+        driver_commands_inst = Mock()
+        driver_commands_mod = Mock()
+        driver_commands_mod.DriverCommands.return_value = driver_commands_inst
+        importlib_mod.import_module.return_value = driver_commands_mod
+
+        command_executor_inst = Mock()
+        command_executor_class.return_value = command_executor_inst
+
+        server_inst = Mock()
+        driver_listener_class.return_value = server_inst
+
+        self._instance.run_driver(driver_name)
+        runtime_configuration_class.assert_called_once_with(config_path)
+        join_calls = [call(self._driver_path, driver_name + '_' + 'RuntimeConfig.yml'),
+                      call(driver_name + '--' + time + '.xml')]
+        os_mod.path.join.has_calls(join_calls)
+        datetime_mod.now.assert_called_once_with()
+        time_inst.strftime.assert_called_once_with('%d-%b-%Y--%H-%M-%S')
+        xml_logger_class.assert_called_once_with(xml_log_path)
+        get_qs_logger_mod.assert_called_once_with(log_group=driver_name, log_file_prefix=driver_name + '_commands',
+                                                  log_category='COMMANDS')
+        runtime_config_instance.read_key.assert_called_once_with('LOGGING.LEVEL', 'INFO')
+        command_logger.setLevel.assert_called_once_with(log_level)
+        importlib_mod.import_module.assert_called_once_with('{}.driver_commands'.format(driver_name), package=None)
+        driver_commands_mod.DriverCommands.assert_called_once_with(command_logger)
+        command_executor_class.assert_called_once_with(driver_commands_inst, command_logger)
+        driver_listener_class.assert_called_once_with(command_executor_inst, xml_logger_inst, command_logger)
+        server_inst.start_listening.assert_called_once_with(port=self._port)

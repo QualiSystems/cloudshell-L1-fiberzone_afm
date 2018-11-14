@@ -2,7 +2,7 @@ import os
 import re
 
 from cloudshell.cli.cli_service import CliService
-from fiberzone_afm_new.cli.l1_cli_handler import L1CliHandler
+from fiberzone_afm.cli.l1_cli_handler import L1CliHandler
 
 
 class TestCliContextManager(object):

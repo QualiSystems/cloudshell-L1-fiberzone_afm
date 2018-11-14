@@ -22,7 +22,7 @@ class Main(object):
     def run_driver(self, driver_name):
         # Reading runtime configuration
         runtime_config = RuntimeConfiguration(
-            os.path.join(self._driver_path, driver_name + '_' + 'RuntimeConfig.yml'))
+            os.path.join(self._driver_path, driver_name + '_runtime_config.yml'))
 
         # Creating XMl logger instance
         xml_file_name = driver_name + '--' + datetime.now().strftime('%d-%b-%Y--%H-%M-%S') + '.xml'
@@ -38,7 +38,7 @@ class Main(object):
 
         # Importing and creating driver commands instance
         driver_commands = importlib.import_module('{}.driver_commands'.format(driver_name), package=None)
-        driver_instance = driver_commands.DriverCommands(command_logger)
+        driver_instance = driver_commands.DriverCommands(command_logger, runtime_config)
 
         # Creating command executor instance
         command_executor = CommandExecutor(driver_instance, command_logger)
@@ -51,4 +51,4 @@ class Main(object):
 
 
 if __name__ == '__main__':
-    Main(*sys.argv).run_driver('fiberzone_afm_new')
+    Main(*sys.argv).run_driver('fiberzone_afm')

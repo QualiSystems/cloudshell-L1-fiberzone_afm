@@ -1,8 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 from cloudshell.cli.command_mode_helper import CommandModeHelper
-from fiberzone_afm_new.cli.fiberzone_command_modes import DefaultCommandMode
-from fiberzone_afm_new.cli.l1_cli_handler import L1CliHandler
+from fiberzone_afm.cli.fiberzone_command_modes import DefaultCommandMode
+from fiberzone_afm.cli.l1_cli_handler import L1CliHandler
 
 
 class FiberzoneCliHandler(L1CliHandler):

@@ -6,7 +6,7 @@ from cloudshell.cli.session.ssh_session import SSHSession
 from cloudshell.cli.session_pool_manager import SessionPoolManager
 from cloudshell.layer_one.core.helper.runtime_configuration import RuntimeConfiguration
 from cloudshell.layer_one.core.layer_one_driver_exception import LayerOneDriverException
-from fiberzone_afm_new.cli.fiberzone_telnet_session import FiberzoneTelnetSession
+from fiberzone_afm.cli.fiberzone_telnet_session import FiberzoneTelnetSession
 
 
 class L1CliHandler(object):

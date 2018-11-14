@@ -3,9 +3,9 @@
 
 import re
 
-import fiberzone_afm_new.command_templates.autoload as command_template
+import fiberzone_afm.command_templates.autoload as command_template
 from cloudshell.cli.command_template.command_template_executor import CommandTemplateExecutor
-from fiberzone_afm_new.helpers.command_actions_helper import CommandActionsHelper
+from fiberzone_afm.helpers.command_actions_helper import CommandActionsHelper
 
 
 class AutoloadActions(object):

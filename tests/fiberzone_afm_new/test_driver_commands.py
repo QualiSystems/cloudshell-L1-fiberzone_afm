@@ -3,7 +3,7 @@ from unittest import TestCase
 from mock import Mock
 
 from cloudshell.layer_one.core.driver_commands_interface import DriverCommandsInterface
-from fiberzone_afm_new.driver_commands import DriverCommands
+from fiberzone_afm.driver_commands import DriverCommands
 
 
 class TestDriverCommands(TestCase):
